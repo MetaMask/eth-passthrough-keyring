@@ -25,6 +25,7 @@
   "homepage": "https://github.com/metamask/eth-passthrough-keyring#readme",
   "dependencies": {
     "eth-sig-util": "^1.4.2",
+    "ethereum-tx-decoder": "^2.0.1",
     "ethereumjs-tx": "^1.3.4",
     "ethereumjs-util": "^5.1.5",
     "ethjs": "^0.4.0",
@@ -41,6 +42,7 @@
     "eslint-plugin-json": "^1.2.0",
     "eslint-plugin-mocha": "^5.0.0",
     "ganache-core": "^2.1.5",
-    "mocha": "^5.0.4"
+    "mocha": "^5.0.4",
+    "sinon": "^6.1.4"
   }
 }

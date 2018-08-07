@@ -3,18 +3,38 @@ const spies = require('chai-spies')
 const {expect} = chai
 const EthereumTx = require('ethereumjs-tx')
 const assert = require('assert')
+const sinon = require('sinon')
 const Ganache = require('ganache-core')
 const PassthroughKeyring = require('../')
 const ethUtil = require('ethereumjs-util')
 const Eth = require('ethjs')
+// const { spawn } = require('child_process')
 
 describe('PassthroughKeyring', function () {
 
-    let keyring, provider
+    let keyring, provider, child, eth, accounts
 
     beforeEach(async function () {
       provider = Ganache.provider()
+      eth = new Eth(provider)
       keyring = new PassthroughKeyring({ provider })
+      accounts = await keyring.getAccounts()
+    })
+
+    describe('getRawTransactionByHash', function () {
+      let infuraProvider, infuraKeyring
+      const oldTxHash = '0x27631e20e2784974526b5d9b9e245a004aa484d276fe186ae2cb243e89790814'
+
+      before(() => {
+        infuraProvider = new Eth.HttpProvider('http://127.0.0.1:8545')
+        infuraKeyring = new PassthroughKeyring({ provider: infuraProvider })
+      })
+
+      it('is able to get an old signed tx from geth', async () => {
+        const rawTx = await infuraKeyring.getRawTransactionByHash(oldTxHash)
+        console.log('OLD RAW TX', rawTx)
+        assert.ok(rawTx)
+      })
     })
 
     describe('Keyring.type', function () {
@@ -72,11 +92,6 @@ describe('PassthroughKeyring', function () {
     })
 
     describe('getAccounts', async function () {
-      let accounts, eth
-      beforeEach(async function () {
-        accounts = await keyring.getAccounts()
-        eth = new Eth(provider)
-      })
 
       it('returns an array of accounts', async () => {
         const ethAccounts = await eth.accounts()
@@ -87,10 +102,17 @@ describe('PassthroughKeyring', function () {
     })
 
     describe('signTransaction', function () {
-      let accounts, eth
-      beforeEach(async function () {
-        accounts = await keyring.getAccounts()
-        eth = new Eth(provider)
+      let stub
+
+      beforeEach(async () => {
+        stub = sinon.stub(keyring, 'getRawTransactionByHash')
+        stub.callsFake(async () => {
+          return '0xf86c328504a817c80082c350947727e5113d1d161373623e5f49fd568b4f543a9e88f42ece6c98e46000801ca0650dd9035e2184759b608abb997ff9e35c6b04cd61f29e52a8365ff7683fffa6a067c5b657358851813f7223f5cb2965ba8236f18f56a92dfb850e4cb35f32cc7f'
+        })
+      })
+
+      afterEach(() => {
+        sinon.restore()
       })
 
       it('should return a signed tx', async () => {
@@ -109,8 +131,20 @@ describe('PassthroughKeyring', function () {
           assert.ok(signed, 'signed tx returned')
           const serialized = signed.serialize()
           assert.ok(serialized, 'was able to serialize')
-          const rawTx = ethUtil.bufferToHex(serialized)
-          assert.ok(rawTx, 'Was able to hexify')
+
+          const expected = {
+            from: '0xa2eff2cb7cdf1d98b922cffeb35ae88a691da5ef',
+            to: '0x7727e5113d1d161373623e5f49fd568b4f543a9e',
+          }
+
+          for (let key in expected) {
+            assert.equal(signed[key], expected[key])
+          }
+
+          assert.ok(signed.r, 'has an r value')
+          assert.ok(signed.s, 'has an s value')
+          assert.ok(signed.v, 'has an v value')
+
         } catch (e) {
           console.log('had a problem', e)
         }
@@ -118,24 +152,15 @@ describe('PassthroughKeyring', function () {
     })
 
     describe('signMessage', function () {
-      it('should throw an error because it is not supported', function () {
-        expect(_ => {
-          keyring.signMessage()
-        }).to.throw('Not supported on this account')
+      it('should return a signed message', async () => {
+        const signed = await keyring.signMessage(accounts[0], '0x12345')
+        console.dir(signed)
       })
-    })
-
-    describe('signPersonalMessage', function () {
-      expect(_ => {
-        keyring.signPersonalMessage()
-      }).to.throw('Not supported on this account')
     })
 
     describe('signTypedData', function () {
         it('should throw an error because it is not supported', function () {
-            expect(_ => {
-                keyring.signTypedData()
-            }).to.throw('Not supported on this device')
+            keyring.signTypedData()
         })
     })
 
@@ -146,21 +171,5 @@ describe('PassthroughKeyring', function () {
             }).to.throw('Not supported on this device')
         })
     })
-
-    describe('forgetDevice', function () {
-        it('should clear the content of the keyring', async function () {
-            // Add an account
-            keyring.setAccountToUnlock(0)
-            await keyring.addAccounts()
-
-            // Wipe the keyring
-            keyring.forgetDevice()
-
-            const accounts = await keyring.getAccounts()
-
-            assert.equal(keyring.isUnlocked(), false)
-            assert.equal(accounts.length, 0)
-        })
-    })
-
 })
+

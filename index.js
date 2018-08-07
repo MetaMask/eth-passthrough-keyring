@@ -5,6 +5,7 @@ const Transaction = require('ethereumjs-tx')
 const HDKey = require('hdkey')
 const hdPathString = `m/44'/60'/0'/0`
 const keyringType = 'RPC Passthrough'
+const decoder = require('ethereum-tx-decoder')
 const pathBase = 'm'
 const DEFAULT_RPC = 'http://127.0.0.1:8545'
 const Eth = require('ethjs')
@@ -58,21 +59,42 @@ class PassthroughKeyring extends EventEmitter {
     const txHash = await this.eth.sendTransaction(serialized)
 
     // TODO: We need to call `eth.getRawTransactionByHash`
-    // Pending support in Ganache to match Geth:
+    // This is not tested well right now, good testing is
+    // pending support in Ganache to match Geth:
     // https://github.com/trufflesuite/ganache-core/issues/135
+
+    // Replicating behavior of ethUtil.ecsign within ethereumjs-tx
+    const hexSig = await this.getRawTransactionByHash(txHash)
+    const sig = decoder.decodeTx(hexSig)
+    Object.assign(tx, sig)
+
     return tx
   }
 
+  getRawTransactionByHash (txHash) {
+    return new Promise((res, rej) => {
+      this.provider.sendAsync({
+        method: 'eth_getRawTransactionByHash',
+        params: [txHash],
+        id: Math.round(Math.random() * 1000),
+      }, (err, result) => {
+        if (err) return rej(err)
+        if (result.error) return rej(result.error)
+        res(result.result)
+      })
+    })
+  }
+
   signMessage (withAccount, data) {
-    throw new Error('Not supported on this account')
+    return this.eth.signMessage(withAccount, data)
   }
 
   signPersonalMessage (withAccount, message) {
-    throw new Error('Not supported on this account')
+    return this.eth.signPersonalMessage(withAccount, message)
   }
 
   signTypedData (withAccount, typedData) {
-    throw new Error('Not supported on this account')
+    return this.eth.signTypedData(withAccount, typedData)
   }
 
   exportAccount (address) {
