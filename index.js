@@ -2,10 +2,10 @@ const { EventEmitter } = require('events')
 const ethUtil = require('ethereumjs-util')
 const sigUtil = require('eth-sig-util')
 const Transaction = require('ethereumjs-tx')
+const decoder = require('ethereum-tx-decoder')
 const HDKey = require('hdkey')
 const hdPathString = `m/44'/60'/0'/0`
 const keyringType = 'RPC Passthrough'
-const decoder = require('ethereum-tx-decoder')
 const pathBase = 'm'
 const DEFAULT_RPC = 'http://127.0.0.1:8545'
 const Eth = require('ethjs')
@@ -63,10 +63,10 @@ class PassthroughKeyring extends EventEmitter {
     // pending support in Ganache to match Geth:
     // https://github.com/trufflesuite/ganache-core/issues/135
 
-    // Replicating behavior of ethUtil.ecsign within ethereumjs-tx
+    // Replicating behavior of ethUtil.ecsign within ethereum-tx-decoder
     const hexSig = await this.getRawTransactionByHash(txHash)
-    const sig = decoder.decodeTx(hexSig)
-    Object.assign(tx, sig)
+    const decoded = decoder.decodeTx(hexSig);
+    ['v', 'r', 's'].forEach(key => tx[key] = decoded[key])
 
     return tx
   }
@@ -86,7 +86,7 @@ class PassthroughKeyring extends EventEmitter {
   }
 
   signMessage (withAccount, data) {
-    return this.eth.signMessage(withAccount, data)
+    return this.eth.sign(withAccount, data)
   }
 
   signPersonalMessage (withAccount, message) {
@@ -94,8 +94,23 @@ class PassthroughKeyring extends EventEmitter {
   }
 
   signTypedData (withAccount, typedData) {
-    return this.eth.signTypedData(withAccount, typedData)
+    return this.passthroughSignTypedData(withAccount, typedData)
   }
+
+  passthroughSignTypedData (address, data) {
+    return new Promise((res, rej) => {
+      this.provider.sendAsync({
+        method: 'eth_signTypedData',
+        params: [address, data],
+        id: Math.round(Math.random() * 1000),
+      }, (err, result) => {
+        if (err) return rej(err)
+        if (result.error) return rej(result.error)
+        res(result.result)
+      })
+    })
+  }
+
 
   exportAccount (address) {
     throw new Error('Not supported on this account')

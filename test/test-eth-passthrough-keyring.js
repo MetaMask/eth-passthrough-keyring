@@ -32,7 +32,6 @@ describe('PassthroughKeyring', function () {
 
       it('is able to get an old signed tx from geth', async () => {
         const rawTx = await infuraKeyring.getRawTransactionByHash(oldTxHash)
-        console.log('OLD RAW TX', rawTx)
         assert.ok(rawTx)
       })
     })
@@ -141,10 +140,6 @@ describe('PassthroughKeyring', function () {
             assert.equal(signed[key], expected[key])
           }
 
-          assert.ok(signed.r, 'has an r value')
-          assert.ok(signed.s, 'has an s value')
-          assert.ok(signed.v, 'has an v value')
-
         } catch (e) {
           console.log('had a problem', e)
         }
@@ -154,22 +149,72 @@ describe('PassthroughKeyring', function () {
     describe('signMessage', function () {
       it('should return a signed message', async () => {
         const signed = await keyring.signMessage(accounts[0], '0x12345')
-        console.dir(signed)
+        assert.ok(signed, 'returned a signed message')
       })
     })
 
     describe('signTypedData', function () {
-        it('should throw an error because it is not supported', function () {
-            keyring.signTypedData()
+      beforeEach(async () => {
+        const stub = sinon.stub(keyring, 'passthroughSignTypedData')
+        stub.callsFake(async () => {
+          return 'a presumably good result!'
         })
+      })
+
+      afterEach(() => {
+        sinon.restore()
+      })
+
+      const typedData = {
+        types: {
+            EIP712Domain: [
+                { name: 'name', type: 'string' },
+                { name: 'version', type: 'string' },
+                { name: 'chainId', type: 'uint256' },
+                { name: 'verifyingContract', type: 'address' },
+            ],
+            Person: [
+                { name: 'name', type: 'string' },
+                { name: 'wallet', type: 'address' }
+            ],
+            Mail: [
+                { name: 'from', type: 'Person' },
+                { name: 'to', type: 'Person' },
+                { name: 'contents', type: 'string' }
+            ],
+        },
+        primaryType: 'Mail',
+        domain: {
+            name: 'Ether Mail',
+            version: '1',
+            chainId: 1,
+            verifyingContract: '0xCcCCccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC',
+        },
+        message: {
+            from: {
+                name: 'Cow',
+                wallet: '0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826',
+            },
+            to: {
+                name: 'Bob',
+                wallet: '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB',
+            },
+            contents: 'Hello, Bob!',
+        },
+      }
+
+      it('should return the signed value', async function () {
+        const data = await keyring.signTypedData(accounts[0], { data: typedData })
+        assert.ok(data)
+      })
     })
 
     describe('exportAccount', function () {
-        it('should throw an error because it is not supported', function () {
-            expect(_ => {
-                keyring.exportAccount()
-            }).to.throw('Not supported on this device')
-        })
+      it('should throw an error because it is not supported', function () {
+        expect(_ => {
+          keyring.exportAccount()
+        }).to.throw('Not supported on this account')
+      })
     })
 })
 
