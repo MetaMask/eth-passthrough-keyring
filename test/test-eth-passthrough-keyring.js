@@ -21,6 +21,7 @@ describe('PassthroughKeyring', function () {
       accounts = await keyring.getAccounts()
     })
 
+    // This method relies on having a Geth instance live on port 8545
     describe('getRawTransactionByHash', function () {
       let infuraProvider, infuraKeyring
       const oldTxHash = '0x27631e20e2784974526b5d9b9e245a004aa484d276fe186ae2cb243e89790814'
@@ -32,7 +33,8 @@ describe('PassthroughKeyring', function () {
 
       it('is able to get an old signed tx from geth', async () => {
         const rawTx = await infuraKeyring.getRawTransactionByHash(oldTxHash)
-        assert.ok(rawTx)
+        console.dir(rawTx)
+        assert.ok(rawTx, 'received old raw tx')
       })
     })
 

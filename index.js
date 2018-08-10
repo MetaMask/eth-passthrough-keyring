@@ -7,6 +7,7 @@ const HDKey = require('hdkey')
 const hdPathString = `m/44'/60'/0'/0`
 const keyringType = 'RPC Passthrough'
 const pathBase = 'm'
+const retry = require('async-retry')
 const DEFAULT_RPC = 'http://127.0.0.1:8545'
 const Eth = require('ethjs')
 const FIELDS = [
@@ -73,24 +74,12 @@ class PassthroughKeyring extends EventEmitter {
   }
 
   pollForTransactionByHash (txHash) {
-    return new Promise((res, rej) => {
-      let count = 5
-      const interval = setInterval(async () => {
-        if (count-- < 0) {
-          clearInterval(interval)
-          rej(new Error('There seems to have been a problem submitting this transaction.'))
-        }
+    const opts = {
+      retries: 5,
+      minTimeout: 300,
+    }
 
-        try {
-          const tx = await this.getRawTransactionByHash(txHash)
-          if (tx) {
-            res(tx)
-          }
-        } catch (e) {
-          console.warn('problem getting raw tx by hash', e)
-        }
-      }, 300)
-    })
+    return retry(this.getRawTransactionByHash.bind(txHash), opts)
   }
 
   getRawTransactionByHash (txHash) {
