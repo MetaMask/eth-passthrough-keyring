@@ -54,7 +54,8 @@ class PassthroughKeyring extends EventEmitter {
   async signTransaction (address, tx) {
     const serialized = { from: address }
     FIELDS.forEach((field) => {
-      serialized[field] = tx.field
+      const value = ethUtil.bufferToHex(tx[field])
+      serialized[field] = ethUtil.bufferToHex(tx[field])
     })
     const txHash = await this.eth.sendTransaction(serialized)
 
