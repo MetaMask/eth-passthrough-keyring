@@ -79,7 +79,7 @@ class PassthroughKeyring extends EventEmitter {
       minTimeout: 300,
     }
 
-    return retry(this.getRawTransactionByHash.bind(txHash), opts)
+    return retry(this.getRawTransactionByHash.bind(this, txHash), opts)
   }
 
   getRawTransactionByHash (txHash) {
