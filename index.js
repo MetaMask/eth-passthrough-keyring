@@ -65,11 +65,32 @@ class PassthroughKeyring extends EventEmitter {
     // https://github.com/trufflesuite/ganache-core/issues/135
 
     // Replicating behavior of ethUtil.ecsign within ethereum-tx-decoder
-    const hexSig = await this.getRawTransactionByHash(txHash)
+    const hexSig = await this.pollForTransactionByHash(txHash)
     const decoded = decoder.decodeTx(hexSig);
     ['v', 'r', 's'].forEach(key => tx[key] = decoded[key])
 
     return tx
+  }
+
+  pollForTransactionByHash (txHash) {
+    return new Promise((res, rej) => {
+      let count = 5
+      const interval = setInterval(async () => {
+        if (count-- < 0) {
+          clearInterval(interval)
+          rej(new Error('There seems to have been a problem submitting this transaction.'))
+        }
+
+        try {
+          const tx = await this.getRawTransactionByHash(txHash)
+          if (tx) {
+            res(tx)
+          }
+        } catch (e) {
+          console.warn('problem getting raw tx by hash', e)
+        }
+      }, 300)
+    })
   }
 
   getRawTransactionByHash (txHash) {
